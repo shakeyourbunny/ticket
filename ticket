@@ -101,21 +101,27 @@ ensure_dir() {
     mkdir -p "$TICKETS_DIR"
 }
 
-# Get ticket file path (supports partial ID matching)
+# Find all ticket files (walks subdirectories, skips hidden dirs within)
+_find_tickets() {
+    find "$TICKETS_DIR" -name '*.md' -not -path "$TICKETS_DIR/.*" 2>/dev/null
+}
+
+# Get ticket file path (supports partial ID matching, walks subdirectories)
 ticket_path() {
     local id="$1"
     # Trim leading/trailing whitespace (handles Claude/agent quirks)
     read -r id <<< "$id"
-    local exact="$TICKETS_DIR/${id}.md"
 
+    # Try exact match at root first (fast path)
+    local exact="$TICKETS_DIR/${id}.md"
     if [[ -f "$exact" ]]; then
         echo "$exact"
         return 0
     fi
 
-    # Try partial match (anywhere in filename)
+    # Try partial match (walks subdirectories)
     local matches
-    matches=$(find "$TICKETS_DIR" -maxdepth 1 -name "*${id}*.md" 2>/dev/null | head -2)
+    matches=$(find "$TICKETS_DIR" -name "*${id}*.md" -not -path "$TICKETS_DIR/.*" 2>/dev/null | head -2)
     local count
     count=$(echo "$matches" | _grep -c . || true)
 
@@ -484,7 +490,7 @@ cmd_dep_tree() {
             print_stack_path[print_sp] = path
         }
     }
-    ' "$TICKETS_DIR"/*.md 2>/dev/null
+    ' $(_find_tickets)
 }
 
 cmd_dep_cycle() {
@@ -595,7 +601,7 @@ cmd_dep_cycle() {
             }
         }
     }
-    ' "$TICKETS_DIR"/*.md 2>/dev/null
+    ' $(_find_tickets)
 }
 
 cmd_dep() {
@@ -737,7 +743,7 @@ cmd_ready() {
             printf "%-8s [P%s][%s] - %s\n", f[2], f[1], f[3], f[4]
         }
     }
-    ' "$TICKETS_DIR"/*.md 2>/dev/null
+    ' $(_find_tickets)
 }
 
 cmd_closed() {
@@ -755,7 +761,7 @@ cmd_closed() {
 
     # List files by mtime (most recent first), filter closed, limit output
     local files
-    files=$(ls -t "$TICKETS_DIR"/*.md 2>/dev/null | head -n 100)
+    files=$(find "$TICKETS_DIR" -name '*.md' -not -path "$TICKETS_DIR/.*" -printf '%T@\t%p\n' 2>/dev/null | sort -rn | head -n 100 | cut -f2)
     [[ -z "$files" ]] && return 0
     echo "$files" | xargs awk -v assignee_filter="$assignee_filter" -v tag_filter="$tag_filter" '
     BEGIN { FS=": "; in_front=0 }
@@ -883,7 +889,7 @@ cmd_blocked() {
             printf "%-8s [P%s][%s] - %s <- %s\n", f[2], f[1], f[3], f[4], f[5]
         }
     }
-    ' "$TICKETS_DIR"/*.md 2>/dev/null
+    ' $(_find_tickets)
 }
 
 cmd_undep() {
@@ -1179,7 +1185,7 @@ cmd_show() {
             }
         }
     }
-    ' "$TICKETS_DIR"/*.md 2>/dev/null
+    ' $(_find_tickets)
     }
 
     if [[ -t 1 && -n "$TICKET_PAGER" ]]; then

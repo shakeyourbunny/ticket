@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+# tk-plugin: Move closed tickets into closed/ subdirectory
+# tk-plugin-version: 1.0.0
+set -euo pipefail
+
+TICKETS_DIR="${TICKETS_DIR:?TICKETS_DIR not set}"
+closed_dir="$TICKETS_DIR/closed"
+
+case "${1:-}" in
+    --tk-describe)
+        echo "tk-plugin: Move closed tickets into closed/ subdirectory"
+        exit 0
+        ;;
+    --dry-run)
+        dry_run=1
+        ;;
+    --undo)
+        # Move everything from closed/ back to root
+        if [[ ! -d "$closed_dir" ]]; then
+            echo "No closed/ directory to undo."
+            exit 0
+        fi
+        count=0
+        for f in "$closed_dir"/*.md; do
+            [[ -f "$f" ]] || continue
+            mv "$f" "$TICKETS_DIR/"
+            count=$((count + 1))
+        done
+        rmdir "$closed_dir" 2>/dev/null || true
+        echo "Restored $count tickets to root."
+        exit 0
+        ;;
+    ""|--help)
+        ;;
+    *)
+        echo "Usage: tk archive [--dry-run|--undo]" >&2
+        exit 1
+        ;;
+esac
+
+dry_run="${dry_run:-0}"
+
+mkdir -p "$closed_dir"
+
+count=0
+for f in "$TICKETS_DIR"/*.md; do
+    [[ -f "$f" ]] || continue
+    status=$(sed -n '/^---$/,/^---$/{ /^status:/{ s/^status: *//; p; q; } }' "$f")
+    if [[ "$status" == "closed" ]]; then
+        name=$(basename "$f")
+        if [[ "$dry_run" -eq 1 ]]; then
+            echo "  would move: $name"
+        else
+            mv "$f" "$closed_dir/$name"
+        fi
+        count=$((count + 1))
+    fi
+done
+
+if [[ "$dry_run" -eq 1 ]]; then
+    echo "$count closed tickets would be moved to closed/"
+else
+    echo "Archived $count closed tickets to closed/"
+fi
