@@ -1,0 +1,17 @@
+# This file is part of the ticket Project.
+# License: MIT. Contact: ticket-project@trinity2k.net
+#
+
+This project is a fork of ticket by Greg Wedow.
+
+ticket
+  Source: https://github.com/wedow/ticket
+  License: MIT
+  Copyright: (c) Greg Wedow and ticket contributors
+  Local changes: configurable ticket ID prefix via .tickets/prefix,
+    symlink-aware find for ticket directories, version and part number
+    display, list command alias for ready.
+
+behave (test dependency, not distributed)
+  Source: https://github.com/behave/behave
+  License: BSD-2-Clause

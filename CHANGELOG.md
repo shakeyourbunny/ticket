@@ -1,6 +1,16 @@
 # Changelog
 
-## [Unreleased]
+## [0.4.0] - 2026-09-11
+
+### Added
+- `--version` / `-V` flag prints version and part number
+- `list` as built-in alias for `ready`
+- Configurable ticket ID prefix via `.tickets/prefix` file
+- Symlink-aware ticket directory traversal (`find -L`)
+- `Makefile` with install, uninstall, and check targets
+- `THIRD_PARTY_LICENSES.txt`
+
+## [Unreleased upstream]
 
 ### Changed
 - Extracted `edit`, `ls`, `query`, and `migrate-beads` commands to plugins (ticket-extras)

@@ -1,8 +1,16 @@
 #!/usr/bin/env bash
+# Portions adapted from ticket (https://github.com/wedow/ticket)
+# Copyright (c) Greg Wedow and ticket contributors
+# Licensed under MIT
+# Local changes: configurable ID prefix, symlink-aware find, version command.
+#
+# This file is part of the ticket Project.
+# License: MIT. Contact: ticket-project@trinity2k.net
+#
 set -euo pipefail
 
-# ticket - minimal ticket system with dependency tracking
-# Stores markdown files with YAML frontmatter in .tickets/
+readonly TK_VERSION="0.4.0"
+readonly TK_PART_NUMBER="SJ-ACC-0001-20260911"
 
 # Find .tickets directory by walking parent directories
 find_tickets_dir() {
@@ -1294,12 +1302,13 @@ Commands:
   undep <id> <dep-id>      Remove dependency
   link <id> <id> [id...]   Link tickets together (symmetric)
   unlink <id> <target-id>  Remove link between tickets
-  ready [-a X] [-T X]      List open/in-progress tickets with deps resolved
+  ready|list [-a X] [-T X] List open/in-progress tickets with deps resolved
   blocked [-a X] [-T X]    List open/in-progress tickets with unresolved deps
   closed [--limit=N] [-a X] [-T X] List recently closed tickets (default 20, by mtime)
   show <id>                Display ticket
   add-note <id> [text]     Append timestamped note (or pipe via stdin)
   super <cmd> [args]       Bypass plugins, run built-in command directly
+  --version, -V            Print version and part number
 EOF
 
     # List installed plugins
@@ -1336,6 +1345,11 @@ fi
 
 # Check for plugin commands first (unless super mode)
 # Plugins are responsible for their own TICKETS_DIR handling
+if [[ "${1:-}" == "--version" || "${1:-}" == "-V" ]]; then
+    printf "tk %s (%s)\n" "$TK_VERSION" "$TK_PART_NUMBER"
+    exit 0
+fi
+
 if [[ $_tk_super -eq 0 && -n "${1:-}" && "${1:-}" != "help" && "${1:-}" != "--help" && "${1:-}" != "-h" ]]; then
     for _prefix in tk ticket; do
         _plugin="${_prefix}-$1"
@@ -1362,7 +1376,7 @@ fi
 
 # Initialize tickets dir for built-in commands (skip for help)
 case "${1:-help}" in
-    help|--help|-h) ;;
+    help|--help|-h|--version|-V) ;;
     *) init_tickets_dir "${1:-}" || exit 1 ;;
 esac
 
@@ -1377,7 +1391,7 @@ case "${1:-help}" in
     undep)  shift; cmd_undep "$@" ;;
     link)   shift; cmd_link "$@" ;;
     unlink) shift; cmd_unlink "$@" ;;
-    ready)  shift; cmd_ready "$@" ;;
+    ready|list)  shift; cmd_ready "$@" ;;
     blocked) shift; cmd_blocked "$@" ;;
     closed) shift; cmd_closed "$@" ;;
     show)   shift; cmd_show "$@" ;;
