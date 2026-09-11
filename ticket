@@ -77,19 +77,21 @@ _sed_i() {
     sed "$@" "$file" > "$tmp" && mv "$tmp" "$file"
 }
 
-# Generate ticket ID from directory name + random string
 generate_id() {
-    local dir_name
-    dir_name=$(basename "$(pwd)")
-
-    # Extract first letter of each hyphenated/underscored segment
     local prefix
-    prefix=$(echo "$dir_name" | sed 's/[-_]/ /g' | awk '{for(i=1;i<=NF;i++) printf substr($i,1,1)}')
 
-    # Fallback to first 3 chars if single segment (prefix too short)
-    [[ ${#prefix} -lt 2 ]] && prefix="${dir_name:0:3}"
+    # .tickets/prefix file overrides the auto-derived prefix
+    if [[ -f "${TICKETS_DIR}/prefix" ]]; then
+        prefix=$(head -1 "${TICKETS_DIR}/prefix" | tr -d '[:space:]')
+    fi
 
-    # 4-char random lower case alphanumeric string
+    if [[ -z "${prefix:-}" ]]; then
+        local dir_name
+        dir_name=$(basename "$(pwd)")
+        prefix=$(echo "$dir_name" | sed 's/[-_]/ /g' | awk '{for(i=1;i<=NF;i++) printf substr($i,1,1)}')
+        [[ ${#prefix} -lt 2 ]] && prefix="${dir_name:0:3}"
+    fi
+
     local hash
     hash=$(LC_ALL=C tr -dc 'a-z0-9' < /dev/urandom | head -c 4)
 
@@ -103,7 +105,7 @@ ensure_dir() {
 
 # Find all ticket files (walks subdirectories, skips hidden dirs within)
 _find_tickets() {
-    find "$TICKETS_DIR" -name '*.md' -not -path "$TICKETS_DIR/.*" 2>/dev/null
+    find -L "$TICKETS_DIR" -name '*.md' -not -path "$TICKETS_DIR/.*" 2>/dev/null
 }
 
 # Get ticket file path (supports partial ID matching, walks subdirectories)
@@ -121,7 +123,7 @@ ticket_path() {
 
     # Try partial match (walks subdirectories)
     local matches
-    matches=$(find "$TICKETS_DIR" -name "*${id}*.md" -not -path "$TICKETS_DIR/.*" 2>/dev/null | head -2)
+    matches=$(find -L "$TICKETS_DIR" -name "*${id}*.md" -not -path "$TICKETS_DIR/.*" 2>/dev/null | head -2)
     local count
     count=$(echo "$matches" | _grep -c . || true)
 
@@ -761,7 +763,7 @@ cmd_closed() {
 
     # List files by mtime (most recent first), filter closed, limit output
     local files
-    files=$(find "$TICKETS_DIR" -name '*.md' -not -path "$TICKETS_DIR/.*" -printf '%T@\t%p\n' 2>/dev/null | sort -rn | head -n 100 | cut -f2)
+    files=$(find -L "$TICKETS_DIR" -name '*.md' -not -path "$TICKETS_DIR/.*" -printf '%T@\t%p\n' 2>/dev/null | sort -rn | head -n 100 | cut -f2)
     [[ -z "$files" ]] && return 0
     echo "$files" | xargs awk -v assignee_filter="$assignee_filter" -v tag_filter="$tag_filter" '
     BEGIN { FS=": "; in_front=0 }
