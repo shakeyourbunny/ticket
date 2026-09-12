@@ -7,23 +7,18 @@ BINDIR ?= $(PREFIX)/bin
 
 .PHONY: install uninstall check test
 
-install: ticket
+install: ticket.py
 	install -d "$(BINDIR)"
-	ln -sf "$(CURDIR)/ticket" "$(BINDIR)/tk"
-	@printf "Installed: %s/tk -> %s/ticket\n" "$(BINDIR)" "$(CURDIR)"
+	ln -sf "$(CURDIR)/ticket.py" "$(BINDIR)/tk"
+	@printf "Installed: %s/tk -> %s/ticket.py\n" "$(BINDIR)" "$(CURDIR)"
 
 uninstall:
 	rm -f "$(BINDIR)/tk"
 	@printf "Removed: %s/tk\n" "$(BINDIR)"
 
 check:
-	bash -n ticket
-	@if [ -x $(HOME)/bin/shellcheck ]; then \
-		$(HOME)/bin/shellcheck ticket; \
-	else \
-		printf "shellcheck not found at ~/bin/shellcheck, skipping\n"; \
-	fi
+	python3 -m py_compile ticket.py
 	@printf "Syntax OK\n"
 
 test:
-	uv run --with behave behave
+	.venv/bin/pytest tests/ -v

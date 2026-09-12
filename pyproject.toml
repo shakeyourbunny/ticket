@@ -1,0 +1,11 @@
+# This file is part of the ticket Project.
+# License: MIT. Contact: ticket-project@trinity2k.net
+
+[project]
+name = "ticket"
+version = "0.5.0"
+description = "Minimal ticket system with dependency tracking"
+requires-python = ">=3.10"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

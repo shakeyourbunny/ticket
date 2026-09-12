@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.5.0] - 2026-09-12
+
+### Changed
+- Full rewrite from bash/awk to Python (573 lines replacing 1406)
+- argparse CLI with per-command --help
+- Ambiguous ticket IDs now list all candidates with titles
+- Makefile targets updated for Python (py_compile, pytest)
+- Test suite moved from behave to pytest (72 tests)
+
+### Added
+- `tree [id]` command: parent-child hierarchy with Unicode box-drawing
+  and type markers (E/B/F/C)
+- `recent [--limit=N]` command: last N modified tickets by mtime,
+  default 5
+
 ## [0.4.0] - 2026-09-11
 
 ### Added

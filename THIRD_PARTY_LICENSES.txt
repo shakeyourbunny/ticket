@@ -8,10 +8,10 @@ ticket
   Source: https://github.com/wedow/ticket
   License: MIT
   Copyright: (c) Greg Wedow and ticket contributors
-  Local changes: configurable ticket ID prefix via .tickets/prefix,
-    symlink-aware find for ticket directories, version and part number
-    display, list command alias for ready.
+  Local changes: full Python rewrite with tree and recent commands,
+    configurable ticket ID prefix, symlink-aware directory walking,
+    version and part number display, list command alias for ready.
 
-behave (test dependency, not distributed)
-  Source: https://github.com/behave/behave
-  License: BSD-2-Clause
+pytest (test dependency, not distributed)
+  Source: https://github.com/pytest-dev/pytest
+  License: MIT
