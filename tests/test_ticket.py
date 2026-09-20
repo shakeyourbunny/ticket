@@ -79,6 +79,16 @@ class TestLoadTicket:
         t = tk.load_ticket(path)
         assert t.external_ref == "gh-123"
 
+    def test_repo_field(self, tickets_dir):
+        path = make_ticket(tickets_dir, id="tst-repo", repo="msgboard/appskap")
+        t = tk.load_ticket(path)
+        assert t.repo == "msgboard/appskap"
+
+    def test_repo_defaults_empty(self, tickets_dir):
+        path = make_ticket(tickets_dir, id="tst-norepo")
+        t = tk.load_ticket(path)
+        assert t.repo == ""
+
 
 class TestLoadAll:
     def test_loads_multiple(self, tickets_dir):
@@ -230,7 +240,7 @@ class TestCmdCreate:
         args = argparse.Namespace(
             title="Test ticket", description="", design="", acceptance="",
             priority=2, type="task", assignee="tester", external_ref="",
-            parent="", tags="",
+            parent="", tags="", repo="msgboard/test",
         )
         tk.cmd_create(args, tickets_dir)
         captured = capsys.readouterr()
@@ -240,13 +250,14 @@ class TestCmdCreate:
         assert t.title == "Test ticket"
         assert t.status == "open"
         assert t.priority == 2
+        assert t.repo == "msgboard/test"
 
     def test_creates_with_parent(self, tickets_dir, capsys):
         make_ticket(tickets_dir, id="tst-parent", title="Parent")
         args = argparse.Namespace(
             title="Child", description="", design="", acceptance="",
             priority=2, type="task", assignee="", external_ref="",
-            parent="tst-parent", tags="",
+            parent="tst-parent", tags="", repo="msgboard/test",
         )
         tk.cmd_create(args, tickets_dir)
         captured = capsys.readouterr()
@@ -258,7 +269,7 @@ class TestCmdCreate:
         args = argparse.Namespace(
             title="Tagged", description="", design="", acceptance="",
             priority=1, type="bug", assignee="alice", external_ref="",
-            parent="", tags="ui,backend",
+            parent="", tags="ui,backend", repo="msgboard/test",
         )
         tk.cmd_create(args, tickets_dir)
         captured = capsys.readouterr()
@@ -271,13 +282,31 @@ class TestCmdCreate:
         args = argparse.Namespace(
             title="", description="", design="", acceptance="",
             priority=2, type="task", assignee="", external_ref="",
-            parent="", tags="",
+            parent="", tags="", repo="msgboard/test",
         )
         tk.cmd_create(args, tickets_dir)
         captured = capsys.readouterr()
         ticket_id = captured.out.strip()
         t = tk.load_ticket(tickets_dir / f"{ticket_id}.md")
         assert t.title == "Untitled"
+
+    def test_creates_with_repo(self, tickets_dir, capsys):
+        args = argparse.Namespace(
+            title="Repo ticket", description="", design="", acceptance="",
+            priority=2, type="task", assignee="", external_ref="",
+            parent="", tags="", repo="sjaandi-libs/augra-theming",
+        )
+        tk.cmd_create(args, tickets_dir)
+        captured = capsys.readouterr()
+        ticket_id = captured.out.strip()
+        t = tk.load_ticket(tickets_dir / f"{ticket_id}.md")
+        assert t.repo == "sjaandi-libs/augra-theming"
+
+    def test_create_requires_repo(self, tickets_dir, monkeypatch):
+        monkeypatch.setenv("TICKETS_DIR", str(tickets_dir))
+        with pytest.raises(SystemExit) as exc_info:
+            tk.main(["create", "Missing repo"])
+        assert exc_info.value.code == 2
 
 
 class TestStatusCommands:
@@ -549,6 +578,13 @@ class TestShowCommand:
         assert "## Blocking" in out
         assert "tst-blocked" in out
 
+    def test_show_repo(self, tickets_dir, capsys):
+        make_ticket(tickets_dir, id="tst-repo", repo="msgboard/appskap")
+        args = argparse.Namespace(id="tst-repo")
+        tk.cmd_show(args, tickets_dir)
+        out = capsys.readouterr().out
+        assert "repo: msgboard/appskap" in out
+
 
 class TestAddNote:
     def test_adds_note(self, tickets_dir, capsys):
@@ -667,6 +703,54 @@ class TestTreeCommand:
 
 
 # ---------------------------------------------------------------------------
+# Edit command
+# ---------------------------------------------------------------------------
+
+class TestEditCommand:
+    def test_edit_priority(self, tickets_dir, capsys):
+        make_ticket(tickets_dir, id="tst-ed1", title="Editable", priority=3)
+        args = argparse.Namespace(
+            id="tst-ed1", priority=1, type=None, assignee=None,
+            repo=None, parent=None, tags=None, external_ref=None,
+        )
+        tk.cmd_edit(args, tickets_dir)
+        t = tk.load_ticket(tickets_dir / "tst-ed1.md")
+        assert t.priority == 1
+
+    def test_edit_repo(self, tickets_dir, capsys):
+        make_ticket(tickets_dir, id="tst-ed2", title="Needs repo")
+        args = argparse.Namespace(
+            id="tst-ed2", priority=None, type=None, assignee=None,
+            repo="msgboard/test", parent=None, tags=None,
+            external_ref=None,
+        )
+        tk.cmd_edit(args, tickets_dir)
+        t = tk.load_ticket(tickets_dir / "tst-ed2.md")
+        assert t.repo == "msgboard/test"
+
+    def test_edit_multiple_fields(self, tickets_dir, capsys):
+        make_ticket(tickets_dir, id="tst-ed3", title="Multi")
+        args = argparse.Namespace(
+            id="tst-ed3", priority=0, type="bug", assignee="stefan",
+            repo=None, parent=None, tags=None, external_ref=None,
+        )
+        tk.cmd_edit(args, tickets_dir)
+        t = tk.load_ticket(tickets_dir / "tst-ed3.md")
+        assert t.priority == 0
+        assert t.type == "bug"
+        assert t.assignee == "stefan"
+
+    def test_edit_no_fields_errors(self, tickets_dir):
+        make_ticket(tickets_dir, id="tst-ed4", title="Nothing")
+        args = argparse.Namespace(
+            id="tst-ed4", priority=None, type=None, assignee=None,
+            repo=None, parent=None, tags=None, external_ref=None,
+        )
+        with pytest.raises(SystemExit):
+            tk.cmd_edit(args, tickets_dir)
+
+
+# ---------------------------------------------------------------------------
 # Plugin discovery
 # ---------------------------------------------------------------------------
 
@@ -701,7 +785,7 @@ class TestMainDispatch:
 
     def test_create_via_main(self, tickets_dir, capsys, monkeypatch):
         monkeypatch.setenv("TICKETS_DIR", str(tickets_dir))
-        tk.main(["create", "Test from main"])
+        tk.main(["create", "Test from main", "--repo", "msgboard/test"])
         out = capsys.readouterr().out
         ticket_id = out.strip()
         assert (tickets_dir / f"{ticket_id}.md").is_file()

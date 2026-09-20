@@ -31,6 +31,7 @@ def make_ticket(
     external_ref: str = "",
     parent: str = "",
     tags: list[str] | None = None,
+    repo: str = "",
     title: str = "Test ticket",
     body: str = "",
 ) -> Path:
@@ -60,6 +61,8 @@ def make_ticket(
         lines.append(f"external-ref: {external_ref}")
     if parent:
         lines.append(f"parent: {parent}")
+    if repo:
+        lines.append(f"repo: {repo}")
     if tags:
         lines.append(f"tags: {tags_str}")
     lines.append("---")

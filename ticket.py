@@ -21,7 +21,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
-TK_VERSION = "0.5.0"
+TK_VERSION = "0.7.0"
 TK_PART_NUMBER = "SJ-ACC-0001-20260912"
 
 VALID_STATUSES = ("open", "in_progress", "closed")
@@ -47,6 +47,7 @@ class Ticket:
     assignee: str = ""
     external_ref: str = ""
     parent: str = ""
+    repo: str = ""
     tags: list[str] = field(default_factory=list)
     title: str = ""
     path: Path | None = None
@@ -103,6 +104,7 @@ def load_ticket(path: Path) -> Ticket:
         assignee=fields.get("assignee", ""),
         external_ref=fields.get("external-ref", ""),
         parent=fields.get("parent", ""),
+        repo=fields.get("repo", ""),
         tags=_parse_list(fields.get("tags", "[]")),
         title=title,
         path=path,
@@ -290,6 +292,8 @@ def cmd_create(args: argparse.Namespace, tickets_dir: Path) -> None:
         lines.append(f"external-ref: {args.external_ref}")
     if parent_id:
         lines.append(f"parent: {parent_id}")
+    if args.repo:
+        lines.append(f"repo: {args.repo}")
     if args.tags:
         tags = [t.strip() for t in args.tags.split(",")]
         lines.append(f"tags: [{', '.join(tags)}]")
@@ -741,6 +745,48 @@ def cmd_add_note(args: argparse.Namespace, tickets_dir: Path) -> None:
     print(f"Note added to {path.stem}")
 
 
+EDITABLE_FIELDS = {
+    "priority": lambda v: str(int(v)),
+    "type": lambda v: v if v in VALID_TYPES else None,
+    "assignee": lambda v: v,
+    "repo": lambda v: v,
+    "parent": None,
+    "tags": lambda v: f"[{', '.join(t.strip() for t in v.split(',') if t.strip())}]",
+    "external-ref": lambda v: v,
+}
+
+
+def cmd_edit(args: argparse.Namespace, tickets_dir: Path) -> None:
+    """Edit frontmatter fields on an existing ticket."""
+    path = resolve_ticket(tickets_dir, args.id)
+    changed = []
+
+    for field_name, validator in EDITABLE_FIELDS.items():
+        attr = field_name.replace("-", "_")
+        val = getattr(args, attr, None)
+        if val is None:
+            continue
+        if validator is None:
+            continue
+        converted = validator(val)
+        if converted is None:
+            _error(f"Invalid value for {field_name}: {val}")
+        save_field(path, field_name, converted)
+        changed.append(f"{field_name}={val}")
+
+    parent = getattr(args, "parent", None)
+    if parent is not None:
+        parent_path = resolve_ticket(tickets_dir, parent)
+        save_field(path, "parent", parent_path.stem)
+        changed.append(f"parent={parent_path.stem}")
+
+    if not changed:
+        _error("No fields specified. Use --priority, --type, --assignee, "
+               "--repo, --parent, --tags, --external-ref")
+
+    print(f"Updated {path.stem}: {', '.join(changed)}")
+
+
 # ---------------------------------------------------------------------------
 # Tree command (parent-child hierarchy)
 # ---------------------------------------------------------------------------
@@ -922,6 +968,7 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--parent", default="")
     p.add_argument("--tags", default="")
     p.add_argument("--external-ref", dest="external_ref", default="")
+    p.add_argument("--repo", required=True, help="Forgejo repo (owner/name)")
     p.add_argument("--design", default="")
     p.add_argument("--acceptance", default="")
 
@@ -990,6 +1037,17 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("id")
     p.add_argument("text", nargs="*")
 
+    # edit
+    p = sub.add_parser("edit", help="Edit ticket fields.")
+    p.add_argument("id")
+    p.add_argument("-p", "--priority", type=int, default=None)
+    p.add_argument("-t", "--type", default=None, choices=VALID_TYPES)
+    p.add_argument("-a", "--assignee", default=None)
+    p.add_argument("--repo", default=None)
+    p.add_argument("--parent", default=None)
+    p.add_argument("--tags", default=None)
+    p.add_argument("--external-ref", dest="external_ref", default=None)
+
     # super
     p = sub.add_parser("super", help="Bypass plugins, run built-in.")
     p.add_argument("super_args", nargs=argparse.REMAINDER)
@@ -1019,9 +1077,10 @@ COMMAND_DISPATCH = {
     "show": cmd_show,
     "tree": cmd_tree,
     "add-note": cmd_add_note,
+    "edit": cmd_edit,
 }
 
-WRITE_COMMANDS = {"create"}
+WRITE_COMMANDS = {"create", "edit"}
 
 
 def main(argv: list[str] | None = None) -> None:
